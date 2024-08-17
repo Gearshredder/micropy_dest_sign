@@ -1,3 +1,4 @@
+import pygame
 import time
 
 class Simulator:
@@ -9,8 +10,18 @@ class Simulator:
         """
         self.config = config
         self.display = [[0] * self.config.COLUMNS for _ in range(self.config.ROWS)]
+        self.previous_display = [[-1] * self.config.COLUMNS for _ in range(self.config.ROWS)]  # Initialize with invalid state
         self.current_row = -1
         self.current_set = 0
+
+        # Pygame setup
+        pygame.init()
+        self.led_size = 10  # Size of each LED
+        self.screen_width = self.config.COLUMNS * self.led_size
+        self.screen_height = self.config.ROWS * self.led_size
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        pygame.display.set_caption(self.config.DISPLAY_NAME)
+        self.clock = pygame.time.Clock()
 
     def setup(self):
         """
@@ -25,7 +36,6 @@ class Simulator:
         :param row: Row index to activate.
         """
         self.current_row = row
-        print(f"Row {row} activated.")
 
     def deactivate_row(self, row):
         """
@@ -33,7 +43,6 @@ class Simulator:
         
         :param row: Row index to deactivate.
         """
-        print(f"Row {row} deactivated.")
         self.current_row = -1
 
     def select_column_set(self, set_number):
@@ -43,7 +52,6 @@ class Simulator:
         :param set_number: 0 for the first set (columns 0-7), 1 for the second set (columns 8-15).
         """
         self.current_set = set_number
-        print(f"Column set {set_number} selected.")
 
     def update_columns(self, data):
         """
@@ -54,27 +62,59 @@ class Simulator:
         start_col = self.current_set * 8
         for i, bit in enumerate(data):
             self.display[self.current_row][start_col + i] = bit
-        print(f"Row {self.current_row} updated: {self.display[self.current_row]}")
 
     def pulse_latch(self):
         """
         Simulate latching the current row data to the display.
         """
-        print(f"Latching data for row {self.current_row}.")
+        if self.display_has_changed():
+            self.display_output()
 
-    def wait(self):
+    def display_has_changed(self):
         """
-        Add a delay to simulate real-time operation.
+        Check if the display content has changed since the last update.
         """
-        time.sleep(0.05)  # Simulate a refresh rate of 20 frames per second
+        if self.display != self.previous_display:
+            self.previous_display = [row[:] for row in self.display]  # Deep copy the current display
+            return True
+        return False
 
     def display_output(self):
         """
         Display the current state of the entire display.
         """
-        print("\nCurrent Display State:")
-        for row in self.display:
-            row_str = ''.join(['█' if bit else ' ' for bit in row])
-            print(row_str)
-        print("\n" + "=" * self.config.COLUMNS + "\n")
+        self.screen.fill((0, 0, 0))  # Clear the screen with black background
+        for row in range(self.config.ROWS):
+            for col in range(self.config.COLUMNS):
+                color = (255, 0, 0) if self.display[row][col] == 1 else (0, 0, 0)
+                pygame.draw.rect(
+                    self.screen,
+                    color,
+                    pygame.Rect(
+                        col * self.led_size, row * self.led_size, self.led_size, self.led_size
+                    )
+                )
+        pygame.display.flip()  # Update the display
+        self.clock.tick(60)  # Limit to 60 FPS
 
+    def handle_events(self):
+        """
+        Handle Pygame events to keep the window responsive.
+        """
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+
+    def wait(self):
+        """
+        Add a delay to simulate real-time operation.
+        """
+        self.handle_events()
+        time.sleep(0.05)  # Simulate a refresh rate of 20 frames per second
+
+    def close(self):
+        """
+        Close the Pygame window.
+        """
+        pygame.quit()
